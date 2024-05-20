@@ -36,9 +36,9 @@ db.connect(err => {
 // Route to login
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
-
+  const hashedPassword = getHashedPassword(password);
   const sql = "SELECT * FROM users WHERE user_email = ? AND user_password = ?"; 
-  db.query(sql, [email, password], (err, data) => {
+  db.query(sql, [email, hashedPassword], (err, data) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
