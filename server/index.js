@@ -7,6 +7,8 @@ const dotenv = require('dotenv');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 
+
+
 // Server Variable Setup
 dotenv.config();
 const app = express();
@@ -242,14 +244,6 @@ app.get('/users', (req, res) => {
       return res.status(404).json({ message: 'No users found' });
     }
   });
-});
-
-
-// Example usage
-getHashedPassword('myPassword').then(hashedPassword => {
-  console.log(hashedPassword); // The hashed password will be logged
-}).catch(err => {
-  console.error(err);
 });
 
 
