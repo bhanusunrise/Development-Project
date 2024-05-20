@@ -37,6 +37,7 @@ db.connect(err => {
 
 // Route to login
 app.post('/login', (req, res) => {
+  
   const { email, password } = req.body;
   const hashedPassword = getHashedPassword(password);
   const sql = "SELECT * FROM users WHERE user_email = ? AND user_password = ?"; 
@@ -124,6 +125,7 @@ else{
 
 // Route to check User Availability
 app.get('/check-availability', (req, res) => {
+
   const { email } = req.body;
 
   const sql = "SELECT * FROM users WHERE user_email = ?"; 
@@ -143,15 +145,21 @@ app.get('/check-availability', (req, res) => {
 
 //Route to get the last user ID
 app.get('/last-user-id', (req, res) => {
+
   const sql = "SELECT * FROM users ORDER BY user_id DESC LIMIT 1"; 
+
   db.query(sql, (err, data) => {
+
     if (err) {
       console.error(err);
       return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+
     }
     if (data.length > 0) {
+
       const lastUserId = data[0].user_id;
       return res.status(200).json({ lastUserId });
+
     } else {
       return res.status(404).json({ message: 'No users found' });
     }
@@ -175,9 +183,8 @@ async function getHashedPassword(password) {
   const additionalBack = "$asd";
   password = additionalFront + password + additionalBack;
 
-  // Generate a salt
+
   const salt = await bcrypt.genSalt(10);
-  // Hash the password
   const hashedPassword = await bcrypt.hash(password, salt);
 
   return hashedPassword;
@@ -186,11 +193,9 @@ async function getHashedPassword(password) {
 // Route to register a user
 app.post('/register', async (req, res) => {
   try {
-    // Make a GET request to the /last-user-id endpoint
     const response = await axios.get('http://localhost:8081/last-user-id');
     const lastUserId = response.data.lastUserId;
 
-    // Generate the next user ID using the lastUserId
     const nextUserId = generateNextUserId(lastUserId);
     const userStatus = "Online";
 
@@ -198,7 +203,6 @@ app.post('/register', async (req, res) => {
 
     const hashedPassword = await getHashedPassword(password);
 
-    // SQL query to insert a new user
     const sql = "INSERT INTO users (user_id, user_name, user_email, user_password, user_status) VALUES (?, ?, ?, ?, ?)"; 
     db.query(sql, [nextUserId, name, email, hashedPassword, userStatus], (err, data) => {
       if (err) {
