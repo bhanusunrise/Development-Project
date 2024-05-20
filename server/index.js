@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
 
 // Server Variable Setup
 dotenv.config();
@@ -166,6 +167,20 @@ function generateNextUserId(currentUserId) {
 
 }
 
+//  Generate Hashed Password
+async function getHashedPassword(password) {
+  const additionalFront = "$2b$10$";
+  const additionalBack = "$asd";
+  password = additionalFront + password + additionalBack;
+
+  // Generate a salt
+  const salt = await bcrypt.genSalt(10);
+  // Hash the password
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  return hashedPassword;
+}
+
 // Route to register a user
 app.post('/register', async (req, res) => {
   try {
@@ -179,9 +194,11 @@ app.post('/register', async (req, res) => {
 
     const { name, email, password } = req.body;
 
+    const hashedPassword = await getHashedPassword(password);
+
     // SQL query to insert a new user
     const sql = "INSERT INTO users (user_id, user_name, user_email, user_password, user_status) VALUES (?, ?, ?, ?, ?)"; 
-    db.query(sql, [nextUserId, name, email, password, userStatus], (err, data) => {
+    db.query(sql, [nextUserId, name, email, hashedPassword, userStatus], (err, data) => {
       if (err) {
         console.error(err);
         return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
@@ -194,8 +211,51 @@ app.post('/register', async (req, res) => {
   }
 });
 
+// Route to get single user
+app.get('/user/:id', (req, res) => {
+  const { id } = req.params;
+  const sql = "SELECT user_id, user_name, user_email, user_profile_url, user_status FROM users WHERE user_id = ?"; 
+  db.query(sql, [id], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ user: data[0] });
+    } else {
+      return res.status(404).json({ message: 'User not found' });
+    }
+  });
+});
+
+//Route to get all users
+app.get('/users', (req, res) => {
+  const sql = "SELECT user_id, user_name, user_email, user_profile_url, user_status FROM users"; 
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ users: data });
+    } else {
+      return res.status(404).json({ message: 'No users found' });
+    }
+  });
+});
+
+
+// Example usage
+getHashedPassword('myPassword').then(hashedPassword => {
+  console.log(hashedPassword); // The hashed password will be logged
+}).catch(err => {
+  console.error(err);
+});
+
 
 // Start server
 app.listen(8081, () => {
   console.log("Listening on port 8081");
 });
+
+
