@@ -89,16 +89,12 @@ app.post('/send-email', (req, res) => {
 
 // Route to change Password
 app.post('/change-password', async (req, res) => {
-const { email, password, updatedPassword } = req.body;
-
-if(password === updatedPassword) {
-  return res.status(400).json({ message: 'New password cannot be same as old password' });
-}
-else{
+const { email, updatedPassword } = req.body;
+const updatedHashedPassword = await getHashedPassword(updatedPassword);
 
 
-    const sql = "SELECT * FROM users WHERE user_email = ? AND user_password = ?"; 
-  db.query(sql, [email, password], (err, data) => {
+const sql = "SELECT user_password FROM users WHERE user_email = ?"; 
+  db.query(sql, [email], (err, data) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
@@ -106,9 +102,10 @@ else{
 
     if (data.length > 0) {
 
+      
 
       const updateSql = "UPDATE users SET user_password = ? WHERE user_email = ?"; 
-      db.query(updateSql, [updatedPassword, email], (err, data) => {
+      db.query(updateSql, [updatedHashedPassword, email], (err, data) => {
         if (err) {
           console.error(err);
           return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
@@ -121,7 +118,7 @@ else{
     }
   });
 
-}})
+})
 
 // Route to check User Availability
 app.get('/check-availability', (req, res) => {
