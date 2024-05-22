@@ -6,7 +6,7 @@ const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
-
+const crypto = require('crypto');
 
 
 // Server Variable Setup
@@ -36,11 +36,15 @@ db.connect(err => {
 
 
 // Route to login
-app.post('/login', (req, res) => {
-  
+
+app.post('/login', async (req, res) => {
+
   const { email, password } = req.body;
-  const hashedPassword = getHashedPassword(password);
-  const sql = "SELECT * FROM users WHERE user_email = ? AND user_password = ?"; 
+
+  const sql = "SELECT user_id, user_name, user_email, user_profile_url, user_status  FROM users WHERE user_email = ? AND user_password = ?"; 
+
+  var hashedPassword = await getHashedPassword(password);
+  console.log(email, password, hashedPassword);
   db.query(sql, [email, hashedPassword], (err, data) => {
     if (err) {
       console.error(err);
@@ -48,9 +52,9 @@ app.post('/login', (req, res) => {
     }
 
     if (data.length > 0) {
-      return res.status(200).json({ message: 'Valid User' });
+      return res.status(200).json({ message: 'Signining in ...' });
     } else {
-      return res.status(404).json({ message: 'Invalid User' });
+      return res.status(404).json({ message: 'Username or password is incorrect' });
     }
   });
 });
@@ -89,16 +93,12 @@ app.post('/send-email', (req, res) => {
 
 // Route to change Password
 app.post('/change-password', async (req, res) => {
-const { email, password, updatedPassword } = req.body;
-
-if(password === updatedPassword) {
-  return res.status(400).json({ message: 'New password cannot be same as old password' });
-}
-else{
+const { email, updatedPassword } = req.body;
+const updatedHashedPassword = await getHashedPassword(updatedPassword);
 
 
-    const sql = "SELECT * FROM users WHERE user_email = ? AND user_password = ?"; 
-  db.query(sql, [email, password], (err, data) => {
+const sql = "SELECT user_password FROM users WHERE user_email = ?"; 
+  db.query(sql, [email], (err, data) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
@@ -106,9 +106,10 @@ else{
 
     if (data.length > 0) {
 
+      
 
       const updateSql = "UPDATE users SET user_password = ? WHERE user_email = ?"; 
-      db.query(updateSql, [updatedPassword, email], (err, data) => {
+      db.query(updateSql, [updatedHashedPassword, email], (err, data) => {
         if (err) {
           console.error(err);
           return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
@@ -121,7 +122,7 @@ else{
     }
   });
 
-}})
+})
 
 // Route to check User Availability
 app.get('/check-availability', (req, res) => {
@@ -161,7 +162,7 @@ app.get('/last-user-id', (req, res) => {
       return res.status(200).json({ lastUserId });
 
     } else {
-      return res.status(404).json({ message: 'No users found' });
+       return res.status(200).json({ lastUserId: 'USER1000' });
     }
 }) ;
 });
@@ -183,18 +184,21 @@ async function getHashedPassword(password) {
   const additionalBack = "$asd";
   password = additionalFront + password + additionalBack;
 
-
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
+  // Create MD5 hash of the modified password
+  const hashedPassword = crypto.createHash('md5').update(password).digest('hex');
 
   return hashedPassword;
 }
-
 // Route to register a user
 app.post('/register', async (req, res) => {
   try {
     const response = await axios.get('http://localhost:8081/last-user-id');
     const lastUserId = response.data.lastUserId;
+    console.log(lastUserId);
+
+    if (lastUserId === '' || lastUserId === 'No users found' || lastUserId === null) {
+      lastUserId = 'USER1000';
+    }
 
     const nextUserId = generateNextUserId(lastUserId);
     const userStatus = "Online";
