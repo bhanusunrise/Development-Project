@@ -5,7 +5,6 @@ const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const axios = require('axios');
-const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 
@@ -14,6 +13,7 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
 
 
 // Database Variables
@@ -47,11 +47,13 @@ app.post('/login', async (req, res) => {
   console.log(email, password, hashedPassword);
   db.query(sql, [email, hashedPassword], (err, data) => {
     if (err) {
-      console.error(err);
+      //console.error(err);
       return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
     }
 
     if (data.length > 0) {
+      req.session.email = result[0].email;
+      console.log(req.session.email);
       return res.status(200).json({ message: 'Signining in ...' });
     } else {
       return res.status(404).json({ message: 'Username or password is incorrect' });
@@ -201,14 +203,16 @@ app.post('/register', async (req, res) => {
     }
 
     const nextUserId = generateNextUserId(lastUserId);
-    const userStatus = "Online";
+    const userStatus = "Offline";
+    const userRestriction = "Allowed";
+    const userPosition = "Open";
 
     const { name, email, password } = req.body;
 
     const hashedPassword = await getHashedPassword(password);
 
-    const sql = "INSERT INTO users (user_id, user_name, user_email, user_password, user_status) VALUES (?, ?, ?, ?, ?)"; 
-    db.query(sql, [nextUserId, name, email, hashedPassword, userStatus], (err, data) => {
+    const sql = "INSERT INTO users (user_id, user_name, user_email, user_password, user_status, user_restriction, user_position) VALUES (?, ?, ?, ?, ?, ?, ?)"; 
+    db.query(sql, [nextUserId, name, email, hashedPassword, userStatus, userRestriction, userPosition], (err, data) => {
       if (err) {
         console.error(err);
         return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
@@ -238,9 +242,9 @@ app.get('/user/:id', (req, res) => {
   });
 });
 
-//Route to get all users
+//Route to get all users with profile url
 app.get('/users', (req, res) => {
-  const sql = "SELECT user_id, user_name, user_email, user_profile_url, user_status FROM users"; 
+  const sql = "SELECT user_id, user_name, user_email, user_profile_url, user_status, user_restriction, user_position FROM users"; 
   db.query(sql, (err, data) => {
     if (err) {
       console.error(err);
@@ -254,6 +258,81 @@ app.get('/users', (req, res) => {
   });
 });
 
+//Route to get all users without profile url
+app.get('/usersList', (req, res) => {
+  const sql = "SELECT user_id, user_name, user_email, user_status, user_restriction, user_position FROM users"; 
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ users: data });
+    } else {
+      return res.status(404).json({ message: 'No users found' });
+    }
+  });
+});
+
+//Route to change the restriction stage
+app.post('/swapRestrict', (req, res) => {
+  const {user_id, user_restriction} = req.body;
+  const updateSql = "UPDATE users SET user_restriction= ? where user_id = ?";
+
+  var newRestriction = "Allowed"
+
+  if(user_restriction === 'Allowed'){
+    newRestriction = "Restricted"
+  } else{
+    newRestriction = "Allowed";
+  }
+
+  db.query(updateSql, [newRestriction, user_id], (err, data) => {
+
+     if (err) {
+          console.error(err);
+          return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        return res.status(200).json({ message: 'Restriction Updated Successfully' });
+      });
+})
+
+// Route to Get last hardware ID
+app.get('/lastHardwareID', (req, res) => {
+  
+  const sql = "SELECT * FROM hardwares ORDER BY hardware_id DESC LIMIT 1"; 
+
+  db.query(sql, (err, data) => {
+
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+
+    }
+    if (data.length > 0) {
+
+      const lastHardwareId = data[0].hardware_id;
+      return res.status(200).json({ lastHardwareId });
+
+    } else {
+       return res.status(200).json({ lastHardwareId: 'SHOP100001' });
+    }
+}) ;
+})
+
+// Route to Register a Hardware
+app.post('/registerHardware', (req, res) => {
+
+  const {hardware_name, hardware_address} = req.body;
+  const sql = "INSERT INTO hardwares (hardware_id, hardware_name, hardware_address) VALUES ('SHOP10000s', ?, ?)"; 
+    db.query(sql, [hardware_name, hardware_address], (err, data) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+      }
+      return res.status(200).json({ message: 'Hardware registered successfully', userId: nextUserId });
+    });
+})
 
 // Start server
 app.listen(8081, () => {
