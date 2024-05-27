@@ -298,7 +298,7 @@ app.post('/swapRestrict', (req, res) => {
 })
 
 // Route to Get last hardware ID
-app.get('/lastHardwareID', (req, res) => {
+app.get('/last-hardware-id', (req, res) => {
   
   const sql = "SELECT * FROM hardwares ORDER BY hardware_id DESC LIMIT 1"; 
 
@@ -315,24 +315,135 @@ app.get('/lastHardwareID', (req, res) => {
       return res.status(200).json({ lastHardwareId });
 
     } else {
-       return res.status(200).json({ lastHardwareId: 'SHOP100001' });
+       return res.status(200).json({ lastHardwareId: 'SHOP100000' });
     }
 }) ;
 })
 
-// Route to Register a Hardware
-app.post('/registerHardware', (req, res) => {
 
-  const {hardware_name, hardware_address} = req.body;
-  const sql = "INSERT INTO hardwares (hardware_id, hardware_name, hardware_address) VALUES ('SHOP10000s', ?, ?)"; 
-    db.query(sql, [hardware_name, hardware_address], (err, data) => {
+//  Function to generate next hardware ID
+
+function generateNextHardwareId(lastHardwareId) {
+  const numericPart = parseInt(lastHardwareId.replace('SHOP', '')) + 1;
+  return 'SHOP' + numericPart.toString().padStart(5, '0');
+}
+
+// Route to Register a Hardware
+
+app.post('/registerHardware', async (req, res) => {
+  try {
+    const { hardware_name, hardware_address, hardware_contact_no } = req.body;
+
+    // Check if hardware_address already exists
+    const checkResponse = await new Promise((resolve, reject) => {
+      const checkSql = "SELECT hardware_id FROM hardwares WHERE hardware_address = ?";
+      db.query(checkSql, [hardware_address], (err, data) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(data);
+      });
+    });
+
+    if (checkResponse.length > 0) {
+      return res.status(400).json({ message: 'Hardware address already exists' });
+    }
+
+    const response = await axios.get('http://localhost:8081/last-hardware-id');
+    let lastHardwareId = response.data.lastHardwareId;
+
+    if (!lastHardwareId || lastHardwareId === 'No hardware found' || lastHardwareId === null) {
+      lastHardwareId = 'SHOP10000';
+    }
+
+    const nextHardwareId = generateNextHardwareId(lastHardwareId);
+
+    const sql = "INSERT INTO hardwares (hardware_id, hardware_name, hardware_address, hardware_contact_no) VALUES (?, ?, ?, ?)";
+    db.query(sql, [nextHardwareId, hardware_name, hardware_address, hardware_contact_no], (err, data) => {
       if (err) {
         console.error(err);
         return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
       }
-      return res.status(200).json({ message: 'Hardware registered successfully', userId: nextUserId });
+      return res.status(200).json({ message: 'Hardware registered successfully', hardwareId: nextHardwareId });
     });
-})
+  } catch (error) {
+    console.error('Error:', error.message);
+    return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+  }
+});
+
+
+// Route to get a single hardware
+
+app.get('/hardware/:address', (req, res) => {
+  const { address } = req.params;
+  const sql = "SELECT hardware_id, hardware_address, hardware_name, hardware_contact_no FROM hardwares WHERE hardware_address = ?"; 
+  db.query(sql, [address], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ hardware: data[0] });
+    } else {
+      return res.status(404).json({ message: 'Hardware not found' });
+    }
+  });
+});
+
+// Route to get all hardwares
+
+app.get('/hardwares', (req, res) => {
+  const sql = "SELECT hardware_id, hardware_address, hardware_name, hardware_contact_no FROM hardwares"; 
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ hardwares: data });
+    } else {
+      return res.status(404).json({ message: 'No hardwares found' });
+    }
+  });
+});
+
+//  Route to update a single hardware
+
+app.put('/hardwareChange/:address', (req, res) => {
+  const { address } = req.params;
+  const { hardware_name, hardware_address, hardware_contact_no } = req.body;
+  const sql = "UPDATE hardwares SET hardware_name = ?, hardware_address = ?, hardware_contact_no = ? WHERE hardware_address = ?";
+  db.query(sql, [hardware_name, hardware_address, hardware_contact_no, address], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.affectedRows > 0) {
+      return res.status(200).json({ message: 'Hardware updated successfully' });
+    } else {
+      return res.status(404).json({ message: 'Hardware not found' });
+    }
+  });
+});
+
+//  Route to delete a single hardware
+
+app.delete('/hardwareDelete/:address', (req, res) => {
+  const { address } = req.params;
+  const sql = "DELETE FROM hardwares WHERE hardware_address = ?";
+  db.query(sql, [address], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.affectedRows > 0) {
+      return res.status(200).json({ message: 'Hardware deleted successfully' });
+    } else {
+      return res.status(404).json({ message: 'Hardware not found' });
+    }
+  });
+});
 
 // Start server
 app.listen(8081, () => {
