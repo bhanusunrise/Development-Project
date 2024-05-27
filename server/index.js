@@ -445,6 +445,78 @@ app.delete('/hardwareDelete/:address', (req, res) => {
   });
 });
 
+// Route to read all packages
+
+app.get('/packages', (req, res) => {
+  const sql = "SELECT * FROM packages";
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ packages: data });
+    } else {
+      return res.status(404).json({ message: 'No packages found' });
+    }
+  });
+});
+
+// Route to get latest package id
+
+app.get('/latestPackageId', (req, res) => {
+  const sql = "SELECT package_id FROM packages ORDER BY package_id DESC LIMIT 1";
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ latestPackageId: data[0].package_id });
+    } else {
+      return res.status(404).json({ message: 'No packages found' });
+    }
+  });
+});
+
+// Function to generate the next package id
+
+async function generateNextPackageId() {
+  try {
+    const response = await axios.get('http://localhost:8081/latestPackageId');
+    if (response.status === 200) {
+      const latestPackageId = response.data.latestPackageId;
+      const numericPart = parseInt(latestPackageId.replace('PACK', ''));
+      const nextNumericPart = numericPart + 1;
+      return `PACK${nextNumericPart}`;
+    }
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      // If no packages are found, return the default ID
+      return 'PACK101';
+    }
+    console.error('Error generating next package ID:', error);
+    throw new Error('Unable to generate next package ID');
+  }
+}
+
+// Route to register a new package
+
+app.post('/registerPackage', async (req, res) => {
+  const {package_name, package_price, package_expire_time } = req.body;
+
+  const sql = "INSERT INTO packages (package_id, package_name, package_price, package_expire_time) VALUES (?, ?, ?, ?)";
+
+  const package_id = await generateNextPackageId();
+  db.query(sql, [package_id, package_name, package_price, package_expire_time], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    return res.status(200).json({ message: 'Package registered successfully' });
+  });
+});
+
 // Start server
 app.listen(8081, () => {
   console.log("Listening on port 8081");
