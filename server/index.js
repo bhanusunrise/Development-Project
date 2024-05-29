@@ -505,6 +505,13 @@ async function generateNextPackageId() {
 app.post('/registerPackage', async (req, res) => {
   const {package_name, package_price, package_expire_time } = req.body;
 
+  const validate_package_price = checkRange(package_price, null, 0);
+  const validate_package_expire_time = checkRange(package_expire_time, null, 30);
+
+  if (!validate_package_price || !validate_package_expire_time) {
+    return res.status(400).json({ message: 'Invalid package price or expire time' });
+  }
+
   const sql = "INSERT INTO packages (package_id, package_name, package_price, package_expire_time) VALUES (?, ?, ?, ?)";
 
   const package_id = await generateNextPackageId();
@@ -522,6 +529,14 @@ app.post('/registerPackage', async (req, res) => {
 app.put('/packageUpdate/:package_id', (req, res) => {
   const { package_id } = req.params;
   const { package_name, package_price, package_expire_time, package_display } = req.body;
+
+  const validate_package_price = checkRange(package_price, null, 0);
+  const validate_package_expire_time = checkRange(package_expire_time, null, 30);
+
+  if (!validate_package_price || !validate_package_expire_time) {
+    return res.status(400).json({ message: 'Invalid package price or expire time' });
+  }
+
   const sql = "UPDATE packages SET package_name = ?, package_price = ?, package_expire_time = ?, package_display = ? WHERE package_id = ?";
   db.query(sql, [package_name, package_price, package_expire_time, package_display,package_id], (err, data) => {
     if (err) {
@@ -552,6 +567,24 @@ app.get('/packageFeatures/:package_id', (req, res) => {
             return res.status(404).json({ message: 'No package features found' });
         }
     });
+});
+
+// Route to delete a single package
+
+app.delete('/packageDelete/:package_id', (req, res) => {
+  const { package_id } = req.params;
+  const sql = "DELETE FROM packages WHERE package_id = ?";
+  db.query(sql, [package_id], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.affectedRows > 0) {
+      return res.status(200).json({ message: 'Package deleted successfully' });
+    } else {
+      return res.status(404).json({ message: 'Package not found' });
+    }
+  });
 });
 
 // Route to add a new package feature
@@ -629,6 +662,37 @@ app.delete('/deletePackageFeature/:feature_id', (req, res) => {
       return res.status(404).json({ message: 'Package feature not found' });
     }
   });
+});
+
+
+// Function to check range
+function checkRange(value, upperRange, lowerRange) {
+ if (upperRange === null || upperRange === undefined || upperRange === '') {
+   return value >= lowerRange;
+ } else if (lowerRange === null || lowerRange === undefined || lowerRange === '') {
+   return value <= upperRange;
+ } else {
+   return value >= lowerRange && value <= upperRange;
+ }
+}
+
+
+// Route to update a feature
+app.put('/updateFeature/:feature_id', (req, res) => {
+    const { feature_id } = req.params;
+    const { feature_name } = req.body;
+    const sql = "UPDATE package_features SET feature_name = ? WHERE feature_id = ?";
+    db.query(sql, [feature_name, feature_id], (err, data) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        if (data.affectedRows > 0) {
+            return res.status(200).json({ message: 'Feature updated successfully' });
+        } else {
+            return res.status(404).json({ message: 'Feature not found' });
+        }
+    });
 });
 
 
