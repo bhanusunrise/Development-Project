@@ -517,6 +517,123 @@ app.post('/registerPackage', async (req, res) => {
   });
 });
 
+// Route to update a single package
+
+app.put('/packageUpdate/:package_id', (req, res) => {
+  const { package_id } = req.params;
+  const { package_name, package_price, package_expire_time, package_display } = req.body;
+  const sql = "UPDATE packages SET package_name = ?, package_price = ?, package_expire_time = ?, package_display = ? WHERE package_id = ?";
+  db.query(sql, [package_name, package_price, package_expire_time, package_display,package_id], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.affectedRows > 0) {
+      return res.status(200).json({ message: 'Package updated successfully' });
+    } else {
+      return res.status(404).json({ message: 'Package not found' });
+    }
+  });
+});
+
+// Route to get all package features
+
+app.get('/packageFeatures/:package_id', (req, res) => {
+    const { package_id } = req.params;
+    const sql = "SELECT * FROM package_features WHERE package_id = ?";
+    db.query(sql, [package_id], (err, data) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        if (data.length > 0) {
+            return res.status(200).json({ packageFeatures: data });
+        } else {
+            return res.status(404).json({ message: 'No package features found' });
+        }
+    });
+});
+
+// Route to add a new package feature
+
+app.post('/addPackageFeature', async (req, res) => {
+  try {
+    const { feature, package_id } = req.body;
+    const feature_id = await generateNextPackageFeatureId();  // Await the function here
+    const sql = "INSERT INTO package_features (feature_name, package_id, feature_id) VALUES (?, ?, ?)";
+    db.query(sql, [feature, package_id, feature_id], (err, data) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+      }
+      return res.status(200).json({ message: 'Package feature added successfully' });
+    });
+  } catch (error) {
+    console.error('Error adding package feature:', error);
+    return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+  }
+});
+
+// Function to generate the next package feature id
+async function generateNextPackageFeatureId() {
+  try {
+    const response = await axios.get('http://localhost:8081/latestPackageFeatureId');
+    if (response.status === 200) {
+      const latestPackageFeatureId = response.data.latestPackageFeatureId;
+      const numericPart = parseInt(latestPackageFeatureId.replace('FEAT', ''));
+      const nextNumericPart = numericPart + 1;
+      return `FEAT${nextNumericPart}`;
+    }
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      // If no package features are found, return the default ID
+      return 'FEAT101';
+    }
+    console.error('Error generating next package feature ID:', error);
+    throw new Error('Unable to generate next package feature ID');
+  }
+}
+
+// Route to get the latest package feature id
+app.get('/latestPackageFeatureId', (req, res) => {
+  const sql = "SELECT feature_id FROM package_features ORDER BY feature_id DESC LIMIT 1";
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    if (data.length > 0) {
+      return res.status(200).json({ latestPackageFeatureId: data[0].feature_id });
+    } else {
+      return res.status(404).json({ message: 'No package features found' });
+    }
+  });
+});
+
+
+// Route to delete a single package feature
+
+app.delete('/deletePackageFeature/:feature_id', (req, res) => {
+  const { feature_id } = req.params;
+  const sql = "DELETE FROM package_features WHERE feature_id = ?";
+  
+  db.query(sql, [feature_id], (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+    }
+    
+    if (data.affectedRows > 0) {
+      return res.status(200).json({ message: 'Package feature deleted successfully' });
+    } else {
+      return res.status(404).json({ message: 'Package feature not found' });
+    }
+  });
+});
+
+
+
+
 // Start server
 app.listen(8081, () => {
   console.log("Listening on port 8081");
