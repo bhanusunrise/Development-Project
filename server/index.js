@@ -512,6 +512,10 @@ app.post('/registerPackage', async (req, res) => {
     return res.status(400).json({ message: 'Invalid package price or expire time' });
   }
 
+    if(!validatePackageCount){
+    return res.status(400).json({ message: 'Sorry. We are in a trouble.' });
+  }
+
   const sql = "INSERT INTO packages (package_id, package_name, package_price, package_expire_time) VALUES (?, ?, ?, ?)";
 
   const package_id = await generateNextPackageId();
@@ -536,6 +540,11 @@ app.put('/packageUpdate/:package_id', (req, res) => {
   if (!validate_package_price || !validate_package_expire_time) {
     return res.status(400).json({ message: 'Invalid package price or expire time' });
   }
+
+  if(!validatePackageCount){
+    return res.status(400).json({ message: 'Sorry. We are in a trouble.' });
+  }
+
 
   const sql = "UPDATE packages SET package_name = ?, package_price = ?, package_expire_time = ?, package_display = ? WHERE package_id = ?";
   db.query(sql, [package_name, package_price, package_expire_time, package_display,package_id], (err, data) => {
@@ -666,6 +675,7 @@ app.delete('/deletePackageFeature/:feature_id', (req, res) => {
 
 
 // Function to check range
+
 function checkRange(value, upperRange, lowerRange) {
  if (upperRange === null || upperRange === undefined || upperRange === '') {
    return value >= lowerRange;
@@ -678,6 +688,7 @@ function checkRange(value, upperRange, lowerRange) {
 
 
 // Route to update a feature
+
 app.put('/updateFeature/:feature_id', (req, res) => {
     const { feature_id } = req.params;
     const { feature_name } = req.body;
@@ -696,7 +707,130 @@ app.put('/updateFeature/:feature_id', (req, res) => {
 });
 
 
+// Route to get all accessible packages
 
+app.get('/getAccessiblePackages', (req, res) => {
+    const sql = "SELECT * FROM packages WHERE package_display = 'Y'";
+    db.query(sql, (err, data) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        if (data.length > 0) {
+            return res.status(200).json({ accessiblePackages: data });
+        } else {
+            return res.status(404).json({ message: 'No accessible packages found' });
+        }
+    });
+});
+
+
+// Route to get Displaying enabled package count
+
+app.get('/getEnabledPackageCount', (req, res) => {
+    const sql = "SELECT COUNT(*) AS count FROM packages WHERE package_display = 'Y'";
+    db.query(sql, (err, data) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        if (data.length > 0) {
+            return res.status(200).json({ enabledPackageCount: data[0].count });
+        } else {
+            return res.status(404).json({ message: 'No enabled packages found' });
+        }
+    });
+});
+
+// Function to validate package count
+async function validatePackageCount() {
+    try {
+        // Fetch enabled package count
+        const response = await axios.get('http://localhost:8081/getEnabledPackageCount');
+        const enabledPackageCount = response.data.enabledPackageCount;
+
+        // Validate package count
+        if (enabledPackageCount > 4) {
+            return false;
+        } 
+        return true;
+
+    } catch (error) {
+        console.error('Error validating package count:', error);
+        // Handle error, return true by default
+        return true;
+    }
+}
+
+
+// Route to search packages
+
+app.get('/searchPackages', (req, res) => {
+    let { 
+
+      package_name, 
+      package_price_lower_range, 
+      package_price_upper_range, 
+      expire_time_lower_range, 
+      expire_time_upper_range,
+      package_display_status
+
+    } = req.body;
+
+    if(package_price_lower_range === null || package_price_lower_range === undefined || package_price_lower_range === ''){
+        package_price_lower_range = 0;
+    }
+
+    if(package_price_upper_range === null || package_price_upper_range === undefined || package_price_upper_range === ''){
+        package_price_upper_range = 9999999999;
+    }
+
+    if(expire_time_lower_range === null || expire_time_lower_range === undefined || expire_time_lower_range === ''){
+        expire_time_lower_range = 0;
+    }
+
+    if(expire_time_upper_range === null || expire_time_upper_range === undefined || expire_time_upper_range === ''){
+        expire_time_upper_range = 9999999;
+    }
+
+    if(package_display_status === null || package_display_status === undefined || package_display_status === ''){
+
+      const sql = "SELECT * FROM packages WHERE package_name LIKE ? AND package_price >= ? AND package_price <= ? AND package_expire_time >= ? AND package_expire_time <= ?";
+
+    db.query(sql, [`%${package_name}%`, package_price_lower_range, package_price_upper_range, expire_time_lower_range, expire_time_upper_range], (err, data) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        if (data.length > 0) {
+            return res.status(200).json({ packages: data });
+        } else {
+            return res.status(404).json({ message: 'No packages found' });
+        }
+    });
+
+    }else{
+
+    const sql = "SELECT * FROM packages WHERE package_name LIKE ? AND package_price >= ? AND package_price <= ? AND package_expire_time >= ? AND package_expire_time <= ? AND package_display = ?";
+
+    db.query(sql, [`%${package_name}%`, package_price_lower_range, package_price_upper_range, expire_time_lower_range, expire_time_upper_range, package_display_status], (err, data) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        if (data.length > 0) {
+            return res.status(200).json({ packages: data });
+        } else {
+            return res.status(404).json({ message: 'No packages found' });
+        }
+    });
+
+    }
+
+
+
+    
+});
 
 // Start server
 app.listen(8081, () => {
