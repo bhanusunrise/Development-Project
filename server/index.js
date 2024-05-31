@@ -762,20 +762,15 @@ async function validatePackageCount() {
     }
 }
 
-
-// Route to search packages
-
 app.get('/searchPackages', (req, res) => {
     let { 
-
       package_name, 
       package_price_lower_range, 
       package_price_upper_range, 
       expire_time_lower_range, 
       expire_time_upper_range,
       package_display_status
-
-    } = req.body;
+    } = req.query; // Use req.query to parse query parameters
 
     if(package_price_lower_range === null || package_price_lower_range === undefined || package_price_lower_range === ''){
         package_price_lower_range = 0;
@@ -793,44 +788,30 @@ app.get('/searchPackages', (req, res) => {
         expire_time_upper_range = 9999999;
     }
 
+    let sql;
+    let params;
+
     if(package_display_status === null || package_display_status === undefined || package_display_status === ''){
-
-      const sql = "SELECT * FROM packages WHERE package_name LIKE ? AND package_price >= ? AND package_price <= ? AND package_expire_time >= ? AND package_expire_time <= ?";
-
-    db.query(sql, [`%${package_name}%`, package_price_lower_range, package_price_upper_range, expire_time_lower_range, expire_time_upper_range], (err, data) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
-        }
-        if (data.length > 0) {
-            return res.status(200).json({ packages: data });
-        } else {
-            return res.status(404).json({ message: 'No packages found' });
-        }
-    });
-
-    }else{
-
-    const sql = "SELECT * FROM packages WHERE package_name LIKE ? AND package_price >= ? AND package_price <= ? AND package_expire_time >= ? AND package_expire_time <= ? AND package_display = ?";
-
-    db.query(sql, [`%${package_name}%`, package_price_lower_range, package_price_upper_range, expire_time_lower_range, expire_time_upper_range, package_display_status], (err, data) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
-        }
-        if (data.length > 0) {
-            return res.status(200).json({ packages: data });
-        } else {
-            return res.status(404).json({ message: 'No packages found' });
-        }
-    });
-
+        sql = "SELECT * FROM packages WHERE package_name LIKE ? AND package_price >= ? AND package_price <= ? AND package_expire_time >= ? AND package_expire_time <= ?";
+        params = [`%${package_name}%`, package_price_lower_range, package_price_upper_range, expire_time_lower_range, expire_time_upper_range];
+    } else {
+        sql = "SELECT * FROM packages WHERE package_name LIKE ? AND package_price >= ? AND package_price <= ? AND package_expire_time >= ? AND package_expire_time <= ? AND package_display = ?";
+        params = [`%${package_name}%`, package_price_lower_range, package_price_upper_range, expire_time_lower_range, expire_time_upper_range, package_display_status];
     }
 
-
-
-    
+    db.query(sql, params, (err, data) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Sorry. We are in a trouble.' });
+        }
+        if (data.length > 0) {
+            return res.status(200).json({ packages: data });
+        } else {
+            return res.status(404).json({ message: 'No packages found' });
+        }
+    });
 });
+
 
 // Start server
 app.listen(8081, () => {
